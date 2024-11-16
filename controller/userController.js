@@ -1,16 +1,5 @@
 const { User } = require('../models');
 
-// Create User
-exports.createUser = async (req, res) => {
-  try {
-    const user = await User.create(req.body);
-    // console.log(req.body);
-    res.status(201).json(user);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
 // Get All Users
 exports.getUsers = async (req, res) => {
   try {
@@ -53,25 +42,3 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
-//Sign In User
-exports.signIn = async (req, res) => {
-    
-    try {
-        const { email, password} = req.body;
-        if(!req.body.email || !req.body.password){
-            return res.status(400).json({ error: 'Please provide email and password' });
-        }
-        const user = await User.findOne({ where: {email} });
-        if(req.body.email === user.email) {
-            // const validPassword = await user.validatePassword(req.body.password);
-            if(req.body.password === user.password) {
-                return res.status(201).json({ success: true });
-            } else {
-                return res.status(401).json({ error: 'Invalid password' });
-            }
-        }
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  };

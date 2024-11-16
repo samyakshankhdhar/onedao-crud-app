@@ -1,11 +1,7 @@
-// controllers/otpController.js
-const crypto = require('crypto');
+const { generateOTP, verifyOTP } = require('./otpHelper'); // Importing the helper methods
 
-const otpStorage = {};
-
-// Generate OTP function
+// Generate OTP API
 exports.generateOTP = async (req, res) => {
-    console.log('generateOTP called');
     const { email } = req.body; // Get email from request body
 
     if (!email) {
@@ -13,32 +9,21 @@ exports.generateOTP = async (req, res) => {
     }
 
     try {
-        const OTP_EXPIRY_DURATION = 5 * 60 * 1000;
-        const otp = crypto.randomInt(100000, 999999).toString();  // Generate a 6-digit OTP
+        // Call the helper method to generate the OTP
+        const otp = generateOTP(email);
 
-        // Send OTP in the response (In a real scenario, you would send the OTP to the user's email)
-        console.log(`OTP for user ${email}: ${otp}`);  // For demonstration purposes, we log the OTP
+        // Send OTP to user (you can modify this to send the OTP via email, etc.)
+        console.log(`OTP for ${email}: ${otp}`); // For demonstration purposes
 
-        // Hash the OTP for secure storage
-    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
-    const expiryTime = Date.now() + OTP_EXPIRY_DURATION;
-
-    // Store the hashed OTP in memory with email as the key
-    otpStorage[email] = { hashedOtp, expiryTime };
-
-    setTimeout(() => {
-        delete otpStorage[email];
-    }, OTP_EXPIRY_DURATION);
-
-        // Send OTP in the response body
-        return otp;
+        // Return OTP in response (You can adjust this to send email, etc.)
+        return res.status(200).json({ otp, message: 'OTP generated successfully' });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Error generating OTP' });
+        return res.status(500).json({ message: 'Error generating OTP' });
     }
 };
 
-// Verify OTP function
+// Verify OTP API
 exports.verifyOTP = async (req, res) => {
     const { email, otp } = req.body;
 
@@ -47,42 +32,13 @@ exports.verifyOTP = async (req, res) => {
     }
 
     try {
-        // Retrieve hashed OTP from memory
-        const otpDetails = otpStorage[email];
+        // Call the helper method to verify the OTP
+        verifyOTP(email, otp);
 
-        if (!otpDetails) {
-            return res.status(400).json({ message: 'Invalid or expired OTP' });
-        }
-        const { hashedOtp, expiryTime } = otpDetails;
-
-        if (Date.now() > expiryTime) {
-            delete otpStorage[email]; // Clean up expired OTP
-            return res.status(400).json({ message: 'OTP has expired.' });
-        }
-
-
-        if (!hashedOtp) {
-            return res.status(400).json({ message: 'Invalid or expired OTP' });
-        }
-
-        // Hash the provided OTP and compare with the stored hash
-        if (Date.now() > expiryTime) {
-            delete otpStorage[email]; // Clean up expired OTP
-            return res.status(400).json({ message: 'OTP has expired' });
-        }
-
-        const hashedInputOtp = crypto.createHash('sha256').update(otp).digest('hex');
-        if (hashedOtp !== hashedInputOtp) {
-            return res.status(400).json({ message: 'Invalid OTP' });
-        }
-        
-
-        // OTP is valid, remove it from memory
-        delete otpStorage[email];
-
+        // OTP verified successfully
         return res.status(200).json({ message: 'OTP verified successfully' });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Error verifying OTP' });
+        return res.status(400).json({ message: err.message });
     }
 };

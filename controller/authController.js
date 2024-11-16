@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { User } = require('../models');
 const { generateToken } = require('../utils/jwtUtils');
-const { generateOTP } = require('../controller/otpController');
+const { generateOTP } = require('../controller/otpHelper');
 const { checkCountryRestriction } = require('../utils/countryUtils'); // Import the utility function
 const geoip = require('geoip-lite');
 
