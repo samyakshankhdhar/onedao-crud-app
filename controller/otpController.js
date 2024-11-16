@@ -13,6 +13,7 @@ exports.generateOTP = async (req, res) => {
     }
 
     try {
+        const OTP_EXPIRY_DURATION = 5 * 60 * 1000;
         const otp = crypto.randomInt(100000, 999999).toString();  // Generate a 6-digit OTP
 
         // Send OTP in the response (In a real scenario, you would send the OTP to the user's email)
@@ -20,10 +21,14 @@ exports.generateOTP = async (req, res) => {
 
         // Hash the OTP for secure storage
     const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+    const expiryTime = Date.now() + OTP_EXPIRY_DURATION;
 
     // Store the hashed OTP in memory with email as the key
-    otpStorage[email] = hashedOtp;
+    otpStorage[email] = { hashedOtp, expiryTime };
 
+    setTimeout(() => {
+        delete otpStorage[email];
+    }, OTP_EXPIRY_DURATION);
 
         // Send OTP in the response body
         return otp;
@@ -43,16 +48,34 @@ exports.verifyOTP = async (req, res) => {
 
     try {
         // Retrieve hashed OTP from memory
-        const hashedOtp = otpStorage[email];
+        const otpDetails = otpStorage[email];
+
+        if (!otpDetails) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+        const { hashedOtp, expiryTime } = otpDetails;
+
+        if (Date.now() > expiryTime) {
+            delete otpStorage[email]; // Clean up expired OTP
+            return res.status(400).json({ message: 'OTP has expired.' });
+        }
+
+
         if (!hashedOtp) {
             return res.status(400).json({ message: 'Invalid or expired OTP' });
         }
 
         // Hash the provided OTP and compare with the stored hash
+        if (Date.now() > expiryTime) {
+            delete otpStorage[email]; // Clean up expired OTP
+            return res.status(400).json({ message: 'OTP has expired' });
+        }
+
         const hashedInputOtp = crypto.createHash('sha256').update(otp).digest('hex');
         if (hashedOtp !== hashedInputOtp) {
             return res.status(400).json({ message: 'Invalid OTP' });
         }
+        
 
         // OTP is valid, remove it from memory
         delete otpStorage[email];

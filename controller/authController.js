@@ -2,10 +2,16 @@ const bcrypt = require('bcryptjs');
 const { User } = require('../models');
 const { generateToken } = require('../utils/jwtUtils');
 const { generateOTP } = require('../controller/otpController');
+const { checkCountryRestriction } = require('../utils/countryUtils'); // Import the utility function
+const geoip = require('geoip-lite');
 
-// Login User
 exports.login = async (req, res) => {
   const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
+}
+
 
   try {
     const user = await User.findOne({ where: { email } });
@@ -19,41 +25,69 @@ exports.login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    // Generate JWT token
     const token = generateToken({ id: user.id, email: user.email });
+
     res.json({ token });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-// Register User
 exports.register = async (req, res) => {
 try {
   const { name, email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Name, email, and password are required' });
+  if (!email || !password ) {
+    return res.status(400).json({ message: 'email and password are required' });
   }
 
-  const existingUser = await User.findOne({ where: { email } });
-  if (existingUser) {
-      return res.status(400).json({ message: 'Email is already registered' });
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
+// Handle localhost case
+if (ip === '127.0.0.1' || ip === '::1') {
+    console.log('Running locally, skipping GeoIP lookup');
+    return registerUser(name, email, password, res);
   }
 
-  const otp = await generateOTP({ body: { email } }, res);
+  const geoData = geoip.lookup(ip);
+  if (!geoData) {
+    return res.status(400).json({ message: 'Unable to detect country based on IP address.' });
+  }
+  const country = geoData.country;
 
-    const newUser = await User.create({ name, email, password });
-    return res.status(201).json({
-        message: 'User created successfully.',
-        user: {
-            id: newUser.id,
-            name: newUser.name,
-            email: newUser.email,
-        },
-        otp: otp, // OTP sent to the client (For demonstration purposes only)
-    });
+  const countryStatus = checkCountryRestriction(country);
+  if (!countryStatus.allowed) {
+      return res.status(403).json({ message: countryStatus.message });
+  }
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
+
+async function registerUser(name, email, password, res) {
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email is already registered.' });
+    }
+  
+    const otp = await generateOTP({ body: { email } }, res);
+  
+    // password hashed before storing
+    const hashedPassword = await bcrypt.hash(password, 10);
+  
+    const newUser = await User.create({ name, email, password: hashedPassword });
+
+    const token = generateToken({ id: newUser.id, email: newUser.email });
+  
+    return res.status(201).json({
+      message: 'User created successfully.',
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+      },
+      otp,
+      token,
+    });
+  }
