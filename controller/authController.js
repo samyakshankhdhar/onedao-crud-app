@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { User } = require('../models');
 const { generateToken } = require('../utils/jwtUtils');
+const { generateOTP } = require('../controller/otpController');
 
 // Login User
 exports.login = async (req, res) => {
@@ -28,11 +29,30 @@ exports.login = async (req, res) => {
 
 // Register User
 exports.register = async (req, res) => {
+try {
   const { name, email, password } = req.body;
 
-  try {
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Name, email, and password are required' });
+  }
+
+  const existingUser = await User.findOne({ where: { email } });
+  if (existingUser) {
+      return res.status(400).json({ message: 'Email is already registered' });
+  }
+
+  const otp = await generateOTP({ body: { email } }, res);
+
     const newUser = await User.create({ name, email, password });
-    res.status(201).json(newUser);
+    return res.status(201).json({
+        message: 'User created successfully.',
+        user: {
+            id: newUser.id,
+            name: newUser.name,
+            email: newUser.email,
+        },
+        otp: otp, // OTP sent to the client (For demonstration purposes only)
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
