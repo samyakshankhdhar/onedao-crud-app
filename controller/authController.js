@@ -27,7 +27,7 @@ exports.login = async (req, res) => {
 
     const token = generateToken({ id: user.id, email: user.email });
 
-    res.json({ token });
+    res.json({ "success":true , "message":"Sign in successfully",token });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -58,6 +58,9 @@ if (ip === '127.0.0.1' || ip === '::1') {
   const countryStatus = checkCountryRestriction(country);
   if (!countryStatus.allowed) {
       return res.status(403).json({ message: countryStatus.message });
+  }
+  else{
+    return registerUser(name, email, password, res);
   }
 
   } catch (err) {

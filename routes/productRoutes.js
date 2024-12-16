@@ -9,3 +9,4 @@ router.post('/update-product/:id', verifyToken, productController.updateProduct)
 router.delete('/delete-product/:id', verifyToken, productController.deleteProduct);
 
 module.exports = router;
+-
